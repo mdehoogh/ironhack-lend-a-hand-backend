@@ -46,12 +46,47 @@ app.use(express.static(path.join(__dirname,'public')));
 // MDH@28JAN2020: not certain why I would need cookie though
 app.use(session({'secret':'cat keyboard',cookie:{}}));
 
+/* I don't think we need these routes
 app.use('/', indexRouter);
 
 app.use('/users', usersRouter);
+*/
 
-// MDH@27JAN2020: cutting off /users before auth (otherwise a little overkill???)
+// MDH@27JAN2020: 'unprotected' route to authentication functions like signup, login, and logout
+// TODO well we might put logout elsewhere though...
 app.use('/auth',authRouter);
+
+// MDH: all subsequent routes are to be protected by protect
+function protect(req,res,next){
+    console.log("Protecting!");
+    // call next with an error if no current user set by a log in
+    if(!req.session.currentUser)next(new Error("Log in first!"));else next();
+}
+
+// once a user is logged in they can request:
+// their profile
+app.get('/profile',protect,(req,res,next)=>{
+
+});
+// their requests
+app.get('/requests',protect,(req,res,next)=>{
+
+});
+// requests they offered to honor
+// unhonoured requests
+
+
+// fall-through routes and error handling in express (see expressjs.com)
+// fall-through
+app.use((req,res,next)=>{
+    res.status(404).json({error:"Invalid route",path:req.path});
+});
+
+// error handling
+app.use((err,req,res,next)=>{
+    console.error(err.stack);
+    res.status(500).send({error:err,path:req.path});
+});
 
 // connect to the MongoDB database for this application (see .env for the connection string used)
 mongoose.connect(process.env.MONGODB_CONNECTION_URL, {useNewUrlParser: true})

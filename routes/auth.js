@@ -2,6 +2,7 @@ var express=require('express');
 var router=express.Router();
 
 var User=require('../models/User');
+var Session=require('../models/Session');
 
 const bcrypt=require('bcrypt');
 
@@ -12,6 +13,31 @@ var bodyParser=require('body-parser');
 
 router.use(bodyParser());
 */
+// we want to keep track of the start and end of member sessions
+function registerMemberSession(member){
+    Session.create({user_id:member._id})
+        .then((session)=>{
+            console.log("Member session of '"+member.name+"' registered!");
+            member.session_id=session._id; // register member session id
+            console.log("Member",member);
+        })
+        .catch((err)=>{
+            console.log("ERROR: Failed to register the member session of "+member.name+".");
+        });
+}
+function unregisterMemberSession(member){
+    // when a member session ends the session counter should be incremented!
+    if(!member.session_id)return console.log("ERROR: No member session to unregister!");
+    Session.updateOne({_id:member.session_id},{active:false})
+        .then((session)=>{
+            console.log("Member session of '"+req.session.currentUser.name+"' unregistered!");
+            delete member.session_id;
+            console.log("Member",member);
+        })
+        .catch((err)=>{
+            console.log("ERROR: Failed to unregister member session of "+rmember.name+".");
+        });
+}
 
 // accept a signup post request returning the newly created user if any
 router.post('/signup',(req,res,next)=>{
@@ -46,6 +72,7 @@ router.post('/signup',(req,res,next)=>{
                         let userInfo={_id:user._id,name:user.name};
                         req.session.currentUser=userInfo; // remember the current user
                         res.status(201).json(userInfo); // send the current user information back
+                        registerMemberSession(req.session.currentUser);
                     })
                     .catch((err)=>{
                         console.log("Sign up of "+req.body.name+" (password: "+req.body.password+") failed",err);
@@ -70,6 +97,7 @@ router.post('/login',(req,res,next)=>{
                     let userInfo={_id:user._id,name:user.name};
                     req.session.currentUser=userInfo; // remember the current user
                     res.json(userInfo); // send the current user information back
+                    registerMemberSession(req.session.currentUser);
                 }else
                     res.status(401).json({error:(err?err:"Incorrect password.")});
             });
@@ -83,8 +111,9 @@ router.post('/logout',(req,res,next)=>{
     // let's demand either a name or an id?????
     if(!req.body._id&&(!req.body.name||req.body.name.trim().length===0))
         return res.status(400).json({error:"No member id or name specified!",body:req.body});
+    // accept if no user session is active anymore
     if(!req.session||!req.session.currentUser)
-        return res.status(410).json({error:"No session active to log out of."});
+        return res.status(202).json({info:"You must have logged out before."});
     if(req.body._id){
         if(req.body._id!==req.session.currentUser._id)
             return res.status(400).json({error:"Invalid member id specified!"});
@@ -92,6 +121,8 @@ router.post('/logout',(req,res,next)=>{
         if(req.body.name.trim()!==req.session.currentUser.name)
             return res.status(400).json({error:"Invalid member name specified!"});
     }
+    // unregister the member session associated with the current user
+    unregisterMemberSession(req.session.currentUser);
     // destroy the associated session
     req.session.destroy((err)=>(err?res.status(500).json({error:err}):res.status(204).send()));
 });
