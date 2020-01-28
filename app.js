@@ -14,7 +14,6 @@ var logger = require('morgan');
 
 var cors=require('cors'); // get in cors
 
-
 var indexRouter = require('./routes/index.js');
 var usersRouter = require('./routes/users.js');
 
@@ -44,9 +43,8 @@ app.use(express.static(path.join(__dirname,'public')));
 // app.use(bodyParser());
 
 // install session middleware
-app.use(session({
-    'secret':'cat whatever'
-}));
+// MDH@28JAN2020: not certain why I would need cookie though
+app.use(session({'secret':'cat keyboard',cookie:{}}));
 
 app.use('/', indexRouter);
 
