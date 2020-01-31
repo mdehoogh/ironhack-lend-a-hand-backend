@@ -24,10 +24,10 @@ var session=require('express-session');
 
 // example
 //var users=require('../data/users.json');
-
+debugger
 var app = express();
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: ["http://localhost:3000", "localhost:3000"],
     "methods": "GET,HEAD,PUT,PATCH,POST,DELETE"
 })); // enable all CORS requests!!!!
 
@@ -44,7 +44,7 @@ app.use(express.static(path.join(__dirname,'public')));
 
 // install session middleware
 // MDH@28JAN2020: not certain why I would need cookie though
-app.use(session({secret:'cat keyboard',cookie:{}}));
+app.use(session({secret:'cat keyboard',cookie:{secure: false}}));
 
 /* I don't think we need these routes
 app.use('/', indexRouter);
@@ -58,24 +58,48 @@ app.use('/auth',authRouter);
 
 // MDH: all subsequent routes are to be protected by protect
 function protect(req,res,next){
+    debugger
     console.log("Protecting!");
+    if(!req.session)return next(new Error("No current session"));
+    console.log("Session: ",req.session);
     // call next with an error if no current user set by a log in
-    if(!req.session.currentUser)next(new Error("Log in first!"));else next();
+    if(!req.session.currentUser)return next(new Error("No current user"));
+    next();
 }
 
 // once a user is logged in they can request:
+const Profile=require('./models/Profile.js');
+
 // their profile
 app.get('/profile',protect,(req,res,next)=>{
+    Profile.findById(req.session.currentUser._id)
+        .populate({path:'owned_groups',select:'name'})
+        .populate({path:'interests',select:'name'})
+        .next((profile)=>{
+            res.json(profile);
+        })
+        .catch((err)=>{
+            res.status(400).json({error:err.message});
+        });
+});
+
+app.get('/groups',protect,(req,res,next)=>{
 
 });
+
 // their requests
 app.get('/requests',protect,(req,res,next)=>{
 
 });
 
+const Location=require('./models/Location');
 // store locations
 app.post('/location',protect,(req,res,next)=>{
+    debugger
     // the body should contain all we need
+    // but the ids of the groups as well that are permitted to view this location
+    // we might store these with the location instead of the recent location??????
+    // NO location is for the end-user itself and can be used freely whereas recent locations are restrictable!!!!
     let location={
         user_id:req.session.currentUser._id,
         latitude:req.body.latitude,
@@ -88,6 +112,9 @@ app.post('/location',protect,(req,res,next)=>{
     Location.create(location)
         .then((location)=>{
             console.log("User location stored!");
+            return location._id;
+        })
+        .then((location_id)=>{
             res.status(204).send();
         })
         .catch((err)=>{

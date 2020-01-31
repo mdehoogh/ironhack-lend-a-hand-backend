@@ -3,6 +3,7 @@ var router=express.Router();
 
 var User=require('../models/User');
 var Session=require('../models/Session');
+var Profile=require('../models/Profile');
 
 const bcrypt=require('bcrypt');
 
@@ -40,6 +41,7 @@ function unregisterMemberSession(member){
 }
 
 // accept a signup post request returning the newly created user if any
+// anybody that signs up should also get a profile as well immediately
 router.post('/signup',(req,res,next)=>{
     // MDH@28JAN2020: I got this code from ~/ironhack/week4/lab-express-basic-auth-1
     // the name and password are in req.body
@@ -66,11 +68,14 @@ router.post('/signup',(req,res,next)=>{
             })
             .catch((err)=>{ // user not found
                 // we can try to create the user, which will fail if a user with that name already exists
+                // immediately creating a profile as well
                 User.create({name:req.body.name,password:hash})
-                    .then((user)=>{
+                    .then((user)=>Profile.create({user_id:user._id}))
+                    .then((profile)=>{
                         // register the current user in the session with name and _id
-                        let userInfo={_id:user._id,name:user.name};
+                        let userInfo={_id:profile.user_id,name:req.body.name};
                         req.session.currentUser=userInfo; // remember the current user
+                        console.log("Current user signed up: ",req.session);
                         res.status(201).json(userInfo); // send the current user information back
                         registerMemberSession(req.session.currentUser);
                     })
@@ -83,6 +88,7 @@ router.post('/signup',(req,res,next)=>{
 });
 
 router.post('/login',(req,res,next)=>{
+    debugger
     // name and password required
     if(req.body.name.trim().length==0)return res.status(400).json({error:"No user name specified!"});
     if(req.body.password.trim().length==0)return res.status(400).json({error:"No password specified!"});
@@ -94,8 +100,10 @@ router.post('/login',(req,res,next)=>{
             // check the password (compare compares plain text password with bcrypted user.password)!!
             bcrypt.compare(req.body.password,user.password,(err,result)=>{
                 if(result){ // password match!
+                    debugger
                     let userInfo={_id:user._id,name:user.name};
                     req.session.currentUser=userInfo; // remember the current user
+                    console.log("Current user logged in: ",req.session);
                     res.json(userInfo); // send the current user information back
                     registerMemberSession(req.session.currentUser);
                 }else
