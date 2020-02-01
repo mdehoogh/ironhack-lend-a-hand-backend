@@ -22,9 +22,49 @@ var authRouter = require('./routes/auth.js');
 // MDH@27JAN2020: for maintaining user sessions
 var session=require('express-session');
 
+// MDH@01FEB2020: e-mail service
+/* NOT MEANT TO BE SENT FROM THE SERVER APPARENTLY
+var emailjs=require('emailjs-com');
+
+var templateParams = {
+    to: 'm.p.a.j.dehoogh@tudelft.nl',
+    from: 'info@lend-a-hand.nl',
+    'receiver': "Marc",
+    'reply-to':'info@marcdehoogh.nl',
+    subject: 'Server start',
+    'message-text': 'The server started up at '+(new Date()).toLocaleString()+"."
+};
+
+emailjs.send('default_service', 'lend_a_hand_nl', templateParams,process.env.EMAILJS_USER_ID)
+    .then(function(response) {
+       console.log('SUCCESS!', response.status, response.text);
+    }, function(error) {
+       console.log('FAILED...', error);
+    });
+*/
+
+const sgMail=require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+(function testSendMail(){
+    console.log("Sendgrid API key: '"+process.env.SENDGRID_API_KEY+"'.");
+    sgMail.send({
+        to:'info@marcdehoogh.nl',
+        from:'m.p.a.j.dehoogh@tudelft.nl',
+        subject:'Lend-a-hand.nl server report',
+        text:'Hi Marc,\n\nThe Lend-a-hand.nl server has started at '+(new Date()).toLocaleString()+'.\n\nWith kind regards,\nLend-a-hand.nl Customer Support Team.',
+    })
+    .then((response)=>{
+        console.log("Send test mail sent.",response);
+    })
+    .catch((err)=>{
+        console.error("Send test mail response error",err);
+    });
+})();
+
 // example
 //var users=require('../data/users.json');
-debugger
+
 var app = express();
 app.use(cors({
     origin: ["http://localhost:3000", "localhost:3000"],
