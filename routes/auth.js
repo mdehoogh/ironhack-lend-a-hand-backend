@@ -29,14 +29,14 @@ function registerMemberSession(member){
 function unregisterMemberSession(member){
     // when a member session ends the session counter should be incremented!
     if(!member.session_id)return console.log("ERROR: No member session to unregister!");
-    Session.updateOne({_id:member.session_id},{active:false})
+    Session.findOneAndUpdate({_id:member.session_id},{active:false})
         .then((session)=>{
-            console.log("Member session of '"+req.session.currentUser.name+"' unregistered!");
+            console.log("Member session of '"+member.name+"' unregistered!");
             delete member.session_id;
             console.log("Member",member);
         })
         .catch((err)=>{
-            console.log("ERROR: Failed to unregister member session of "+rmember.name+".");
+            console.log("ERROR: Failed to unregister member session of "+member.name+".");
         });
 }
 

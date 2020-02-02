@@ -115,7 +115,7 @@ app.get('/profile',protect,(req,res,next)=>{
     Profile.findById(req.session.currentUser._id)
         .populate({path:'owned_groups',select:'name'})
         .populate({path:'interests',select:'name'})
-        .next((profile)=>{
+        .then((profile)=>{
             res.json(profile);
         })
         .catch((err)=>{
@@ -147,13 +147,34 @@ app.post('/location',protect,(req,res,next)=>{
         altitude:req.body.altitude,
         accuracy:req.body.accuracy,
         timestamp:req.body.timestamp,
-        visibility:req.body.visibility,
     };
     Location.create(location)
         .then((location)=>{
             console.log("User location stored!");
-            return location._id;
+            // perhaps we should now get the ids of the member groups this user owns or activity groups this person is in??????
+            return RecentLocation.create({location_id:location._id,user_id:location.user_id});
         })
+        .then((recentLocation)=>{
+            res.status(204).json({_id:recentLocation.location_id});
+        })
+        .catch((err)=>{
+            res.status(400).json({error:err.message});
+        });
+});
+
+//  recent locations
+const RecentLocation=require('./models/RecentLocation');
+// store
+app.post('/recentlocation',protect,(req,res,next)=>{
+    if(!req.body.hasOwnProperty('location_id'))return next(new Error("Missing location id."));
+    let recentlocation={
+        user_id:req.session.currentUser._id,
+        location_id:req.body.location_id,
+    }
+    if(req.body.hasOwnProperty("member_ids"))recentlocation.member_ids=req.body.member_ids;
+    if(req.body.hasOwnProperty("membergroup_ids"))recentlocation.membergroup_ids=req.body.membergroup_ids;
+    if(req.body.hasOwnProperty("activitygroup_ids"))recentlocation.activitygroup_ids=req.body.activitygroup_ids;
+    RecentLocation.create(recentlocation)
         .then((location_id)=>{
             res.status(204).send();
         })
@@ -161,10 +182,24 @@ app.post('/location',protect,(req,res,next)=>{
             res.status(400).json({error:err.message});
         });
 });
-
-// requests they offered to honor
-// unhonoured requests
-
+// retrieve
+app.get('/recentlocation',protect,(req,res,next)=>{
+    // user wants to retrieve all recent known locations
+    // get all records of other users
+    RecentLocation.find({'user_id':{$ne:req.session.currentUser._id}},{'created_at':1})
+        .populate('location_id')
+        .then((recentLocations)=>{
+            console.log("Processing "+recentlocations.length+" recent locations.");
+            let distinctUserRecentLocations={};
+            recentlocations.forEach((recentLocation)=>{
+                distinctUserRecentLocations={longitude:recentLocation.location_id.longitude,latitude:recentLocation.location_id.lattitude};
+                if(recentLocation.location_id.altitude)distinctUserRecentLocation.altitude=recentLocation.location_id.altitude;
+                recentlocationdata[recentLocation.user_id]=distinctUserRecentLocations;
+            });
+            res.json(recentlocationdata);
+        })
+        .catch(err=>res.status(400).json({error:err.message}));
+});
 
 // fall-through routes and error handling in express (see expressjs.com)
 // fall-through

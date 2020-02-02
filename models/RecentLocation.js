@@ -3,14 +3,15 @@ const Schema=mongoose.Schema;
 
 // the schema itself is empty i.e. only the _id is present
 const recentLocationSchema=new mongoose.Schema({
-            user_id:{type:mongoose.SchemaTypes.ObjectId,ref:"user"},
             location_id:{type:mongoose.SchemaTypes.ObjectId,ref:"location"},
-            group_ids:[{type:mongooseSchemaTypes.ObjectId,ref:"group"}],
+            user_id:{type:mongoose.SchemaTypes.ObjectId,ref:"user"},
+            membergroup_ids:[{type:mongoose.SchemaTypes.ObjectId,ref:"membergroup"}],
+            activitygroup_ids:[{type:mongoose.SchemaTypes.ObjectId,ref:"activitygroup"}],
         }/*,{
             timestamps: { createdAt: "created_at", updatedAt: "updated_at" }
         }*/
     );
-  
-  const RecentLocation = mongoose.model("recentlocation",recentLocationSchema);
-  
-  module.exports = RecentLocation;
+
+const RecentLocation = mongoose.model("recentlocation",recentLocationSchema);
+
+module.exports = RecentLocation;
