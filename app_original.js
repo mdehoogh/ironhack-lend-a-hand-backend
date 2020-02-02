@@ -1,27 +1,48 @@
-// MDH@02FEB2020: this is the Chat app app.js that we need to merge somehow with app_original.js
+require('dotenv').config();
 
-var createError = require("http-errors");
-var express = require("express");
-var path = require("path");
-var cookieParser = require("cookie-parser");
-var logger = require("morgan");
-var indexRouter = require("./routes/index");
-var chatRoomRouter = require("./routes/chatRoom");
-var app = express();
-const cors = require("cors");
-// view engine setup
-app.set("views", path.join(__dirname, "views"));
-app.set("view engine", "jade");
-app.use(logger("dev"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
-app.use(cors());
-app.use("/", indexRouter);
-app.use("/chatroom", chatRoomRouter);
+var path = require('path');
 
-// MDH@02FEB2020: here we insert the non-chatroom specific backend stuff from app_original.js
+var express = require('express');
+
+var mongoose = require('mongoose');
+
+var cookieParser = require('cookie-parser');
+
+var bodyParser = require('body-parser');
+
+var logger = require('morgan');
+
+var cors=require('cors'); // get in cors
+
+var indexRouter = require('./routes/index.js');
+var usersRouter = require('./routes/users.js');
+
+var authRouter = require('./routes/auth.js');
+
+// MDH@27JAN2020: for maintaining user sessions
+var session=require('express-session');
+
+// MDH@01FEB2020: e-mail service
+/* NOT MEANT TO BE SENT FROM THE SERVER APPARENTLY
+var emailjs=require('emailjs-com');
+
+var templateParams = {
+    to: 'm.p.a.j.dehoogh@tudelft.nl',
+    from: 'info@lend-a-hand.nl',
+    'receiver': "Marc",
+    'reply-to':'info@marcdehoogh.nl',
+    subject: 'Server start',
+    'message-text': 'The server started up at '+(new Date()).toLocaleString()+"."
+};
+
+emailjs.send('default_service', 'lend_a_hand_nl', templateParams,process.env.EMAILJS_USER_ID)
+    .then(function(response) {
+       console.log('SUCCESS!', response.status, response.text);
+    }, function(error) {
+       console.log('FAILED...', error);
+    });
+*/
+
 const sgMail=require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -41,14 +62,25 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
     });
 })();
 
+// example
+//var users=require('../data/users.json');
+
+var app = express();
+app.use(cors({
+    origin: ["http://localhost:3000", "localhost:3000"],
+    "methods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+})); // enable all CORS requests!!!!
+
+app.use(logger('dev'));
+app.use(express.json());
+
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname,'public')));
+
+
 // MDH@27JAN2020: we'll be needing the body parser!
 // app.use(bodyParser());
-var mongoose = require('mongoose');
-
-var authRouter = require('./routes/auth.js');
-
-// MDH@27JAN2020: for maintaining user sessions
-var session=require('express-session');
 
 // install session middleware
 // MDH@28JAN2020: not certain why I would need cookie though
@@ -168,23 +200,19 @@ app.get('/recentlocation',protect,(req,res,next)=>{
         })
         .catch(err=>res.status(400).json({error:err.message}));
 });
-// MDH@02FEB2020: END of specific backend stuff
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
-});
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
-// render the error page
-  res.status(err.status || 500);
-  res.render("error");
+// fall-through routes and error handling in express (see expressjs.com)
+// fall-through
+app.use((req,res,next)=>{
+    res.status(404).json({error:"Invalid route",path:req.path});
 });
 
-// MDH@02FEB2020: stuff from app_original.js that we use to connect to the backend database
+// error handling
+app.use((err,req,res,next)=>{
+    console.error(err.stack);
+    res.status(500).send({error:err,path:req.path});
+});
+
 const Session=require('./dbmodels/Session');
 
 // connect to the MongoDB database for this application (see .env for the connection string used)
@@ -213,6 +241,5 @@ mongoose.connect(process.env.MONGODB_CONNECTION_URL, {useNewUrlParser:true,useUn
     console.log("ERROR: Failed to connect to the MongoDB database at "+process.env.MONGODB_CONNECTION_URL+".");
     console.log("\t",error);
 });
-// MDH@02FEB2020: END of stuff from app_original.js that we use to connect to the backend database
 
 module.exports = app;

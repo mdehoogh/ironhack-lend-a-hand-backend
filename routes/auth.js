@@ -1,9 +1,9 @@
 var express=require('express');
 var router=express.Router();
 
-var User=require('../models/User');
-var Session=require('../models/Session');
-var Profile=require('../models/Profile');
+var User=require('../dbmodels/User');
+var Session=require('../dbmodels/Session');
+var Profile=require('../dbmodels/Profile');
 
 const bcrypt=require('bcrypt');
 
