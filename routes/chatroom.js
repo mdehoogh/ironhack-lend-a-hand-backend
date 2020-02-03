@@ -20,6 +20,7 @@ router.post("/chatroom", async (req, res, next) => {
 router.get("/chatroom/messages/:chatRoomName", async (req, res, next) => {
   try {
     const chatRoomName = req.params.chatRoomName;
+    console.log("Messages requested of chat room '"+chatRoomName+"'.");
     const chatRooms = await models.ChatRoom.findAll({
       where: {
         name: chatRoomName,
@@ -31,8 +32,10 @@ router.get("/chatroom/messages/:chatRoomName", async (req, res, next) => {
         chatRoomId,
       },
     });
+    console.log("Number of messages in '"+chatRoomName+"'",(messages?messages.length:0));
     res.send(messages);
   } catch (error) {
+    console.error(error);
     res.send([]);
   }
 });

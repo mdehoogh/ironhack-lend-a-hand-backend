@@ -81,8 +81,8 @@ const Profile=require('./dbmodels/Profile');
 // their profile
 app.get('/profile',protect,(req,res,next)=>{
     Profile.findById(req.session.currentUser._id)
-        .populate({path:'owned_groups',select:'name'})
-        .populate({path:'interests',select:'name'})
+        .populate({path:'membergroup_ids',select:'name'})
+        .populate({path:'activitygroup_ids',select:'name'})
         .then((profile)=>{
             res.json(profile);
         })

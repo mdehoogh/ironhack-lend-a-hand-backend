@@ -33,6 +33,7 @@ io.on("connection", socket => {
       author,
       message: message,
     });
+    console.log("Emitting new message response: '"+JSON.stringify(chatMessage)+"'.");
     io.emit("newMessage", chatMessage);
   });
 });
