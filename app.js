@@ -42,7 +42,9 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 })();
 
 // MDH@27JAN2020: we'll be needing the body parser!
-// app.use(bodyParser());
+var bodyParser = require('body-parser');
+app.use(bodyParser.urlencoded({extended:false}));
+
 var mongoose = require('mongoose');
 
 var authRouter = require('./routes/auth.js');
@@ -52,7 +54,13 @@ var session=require('express-session');
 
 // install session middleware
 // MDH@28JAN2020: not certain why I would need cookie though
-app.use(session({secret:'cat keyboard',cookie:{secure: false}}));
+app.use(session({
+                    // genid:(req)=>genuuid(),
+                    secret:'cat keyboard',
+                    cookie:{secure: false},
+                    resave:true,
+                    saveUninitialized:true,
+                }));
 
 /* I don't think we need these routes
 app.use('/', indexRouter);
@@ -168,6 +176,124 @@ app.get('/recentlocation',protect,(req,res,next)=>{
         })
         .catch(err=>res.status(400).json({error:err.message}));
 });
+
+// get all users
+const User=require('./dbmodels/User');
+app.get('/users',(req,res,next)=>{
+    User.find()
+        .then((users)=>{res.json(users);})
+        .catch((err)=>res.status(400).json({error:err.message}));
+});
+
+// get all recent locations
+app.get('/recentlocations',(req,res,next)=>{
+    // user wants to retrieve all recent known locations
+    // get all records of other users
+    RecentLocation.find()
+        .populate('user_id')
+        .populate('location_id')
+        .then((recentLocations)=>{
+            console.log("Processing "+recentLocations.length+" recent locations.");
+            let locations=recentLocations.map(
+                (recentLocation)=>{return{
+                                    user:recentLocation.user_id.name,
+                                    timestamp:recentLocation._id.getTimestamp().toISOString(),
+                                    latitude:recentLocation.location_id.latitude,
+                                    longitude:recentLocation.location_id.longitude,
+                                  }});
+            res.json(locations);
+        })
+        .catch(err=>res.status(400).json({error:err.message}));
+});
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//:::                                                                         :::
+//:::  This routine calculates the distance between two points (given the     :::
+//:::  latitude/longitude of those points). It is being used to calculate     :::
+//:::  the distance between two locations using GeoDataSource (TM) prodducts  :::
+//:::                                                                         :::
+//:::  Definitions:                                                           :::
+//:::    South latitudes are negative, east longitudes are positive           :::
+//:::                                                                         :::
+//:::  Passed to function:                                                    :::
+//:::    lat1, lon1 = Latitude and Longitude of point 1 (in decimal degrees)  :::
+//:::    lat2, lon2 = Latitude and Longitude of point 2 (in decimal degrees)  :::
+//:::    unit = the unit you desire for results                               :::
+//:::           where: 'M' is statute miles (default)                         :::
+//:::                  'K' is kilometers                                      :::
+//:::                  'N' is nautical miles                                  :::
+//:::                                                                         :::
+//:::  Worldwide cities and other features databases with latitude longitude  :::
+//:::  are available at https://www.geodatasource.com                         :::
+//:::                                                                         :::
+//:::  For enquiries, please contact sales@geodatasource.com                  :::
+//:::                                                                         :::
+//:::  Official Web site: https://www.geodatasource.com                       :::
+//:::                                                                         :::
+//:::               GeoDataSource.com (C) All Rights Reserved 2018            :::
+//:::                                                                         :::
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+function distance(lat1, lon1, lat2, lon2, unit) {
+	if ((lat1 === lat2) && (lon1 === lon2)) return 0;
+    var radlat1 = Math.PI * lat1/180;
+    var radlat2 = Math.PI * lat2/180;
+    var theta = lon1-lon2;
+    var radtheta = Math.PI * theta/180;
+    var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
+    if (dist > 1) {
+        dist = 1;
+    }
+    dist = Math.acos(dist);
+    dist = dist * 180/Math.PI;
+    dist = dist * 60 * 1.1515;
+    if (unit==="K") { dist = dist * 1.609344 }
+    if (unit==="N") { dist = dist * 0.8684 }
+    return dist;
+}
+
+// requesting the list of lend-a-handers nearby (let's say within a mile or so)
+// NOTE to be able to test with Postman for now unprotected, and expecting the user_id in the body
+app.post('/lendahandersnearby',(req,res,next)=>{
+    // the current user id has preference over any user_id passed in!!!
+    console.log("Body of requesting lend-a-handers nearby: ",req.body.user_id);
+    let currentUserId=(req.session&&req.session.currentUser?req.session.currentUser._id:null);
+    if(!currentUserId)currentUserId=req.body.user_id;
+    if(!currentUserId)return next(new Error("No user id specified!"));
+    RecentLocation.find({},{_id:1})
+        .populate('user_id')
+        .populate('location_id')
+        .then((recentLocations)=>{
+            console.log("Recent locations",recentLocations);
+            // for each of the users we need to determine the last known location
+            let users={}; // keep a list of users
+            let userLocations={};
+            let currentUserLocation=null;
+            recentLocations.forEach((recentLocation)=>{
+                console.log("Recent location: ",recentLocation);
+                if(recentLocation.user_id._id==currentUserId){
+                    currentUserLocation={timestamp:recentLocation._id.getTimestamp().toISOString(),latitude:recentLocation.location_id.latitude,longitude:recentLocation.location_id.longitude};
+                }else{
+                    userLocations[recentLocation.user_id._id]={timestamp:recentLocation._id.getTimestamp().toISOString(),latitude:recentLocation.location_id.latitude,longitude:recentLocation.location_id.longitude};
+                    if(!users.hasOwnProperty(recentLocation.user_id._id))users[recentLocation.user_id._id]=recentLocation.user_id;
+                }
+            });
+            console.log("Recent user locations",userLocations);
+            let nearbyUsers=[];
+            if(currentUserLocation){
+                for(let user_id in userLocations){
+                    let userLocation=userLocations[user_id];
+                    let userDistance=distance(userLocation.latitude,userLocation.longitude,currentUserLocation.latitude,currentUserLocation.longitude,"K");
+                    console.log("Distance: "+userDistance+".");
+                    if(userDistance<=1)nearbyUsers.push({_id:user_id,name:users[user_id].name,distance:userDistance,timestamp:userLocation.timestamp});
+                };
+            }else
+                console.log("No current user location found!");
+            console.log("Number of nearby users: "+nearbyUsers.length+".");
+            res.json(nearbyUsers);
+        })
+        .catch(err=>res.status(400).json({error:err.message}));
+
+});
 // MDH@02FEB2020: END of specific backend stuff
 
 // catch 404 and forward to error handler
@@ -181,7 +307,7 @@ app.use(function(err, req, res, next) {
   res.locals.error = req.app.get("env") === "development" ? err : {};
 // render the error page
   res.status(err.status || 500);
-  res.render("error");
+  res.json({error:err.message});
 });
 
 // MDH@02FEB2020: stuff from app_original.js that we use to connect to the backend database
@@ -207,6 +333,13 @@ mongoose.connect(process.env.MONGODB_CONNECTION_URL, {useNewUrlParser:true,useUn
         })
         .catch((err)=>{
             console.log("Getting the active members error",err);
+        });
+    RecentLocation.find()
+        .then((recentLocations)=>{
+            console.log("Recent locations",recentLocations);
+        })
+        .catch((err)=>{
+            console.error(err);
         });
 })
 .catch((error) => {

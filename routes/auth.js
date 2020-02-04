@@ -88,12 +88,13 @@ router.post('/signup',(req,res,next)=>{
 });
 
 router.post('/login',(req,res,next)=>{
-    debugger
     // name and password required
     if(req.body.name.trim().length==0)return res.status(400).json({error:"No user name specified!"});
     if(req.body.password.trim().length==0)return res.status(400).json({error:"No password specified!"});
-    if(req.session&&req.session.currentUser)res.status(400).json({error:"User session still active. Please logout first!"});
+    // PROBLEM this could be another user logging in??????????
+    // if(req.session&&req.session.currentUser)res.status(400).json({error:"User session still active. Please logout first!"});
     // let's see if a user with the given name exists
+    console.log("Looking for user '"+req.body.name+"'.");
     User.findOne({name:req.body.name})
         .then((user)=>{ // a user with that name found
             console.log("User",user);
