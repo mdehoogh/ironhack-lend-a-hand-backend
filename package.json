@@ -20,7 +20,7 @@
     "debug": "~2.6.9",
     "dotenv": "^8.2.0",
     "emailjs-com": "^2.4.1",
-    "express": "~4.16.1",
+    "express": "~4.17.3",
     "express-session": "^1.17.0",
     "gen-uuid": "0.0.1",
     "jade": "^1.11.0",
